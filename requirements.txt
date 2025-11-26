@@ -10,6 +10,7 @@ supabase==2.3.0
 
 # Utilities
 python-dotenv==1.0.0
+requests==2.32.3
 
 # Optional: For better development experience
 python-multipart==0.0.6  # For form data handling
