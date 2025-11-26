@@ -15,10 +15,12 @@ function updateStatCards(items) {
 }
 
 function buildPieChart(stats) {
-  const ctx = document.getElementById('pieChart');
-  if (!ctx) return;
+  const canvas = document.getElementById('pieChart');
+  if (!canvas) return;
+  const existing = window.Chart && window.Chart.getChart ? window.Chart.getChart(canvas) : null;
+  if (existing) existing.destroy();
 
-  new Chart(ctx, {
+  new Chart(canvas, {
     type: 'doughnut',
     data: {
       labels: ['True', 'False', 'Misleading', 'Unverified'],
@@ -60,10 +62,12 @@ function buildPieChart(stats) {
 }
 
 function buildBarChart(stats) {
-  const ctx = document.getElementById('barChart');
-  if (!ctx) return;
+  const canvas = document.getElementById('barChart');
+  if (!canvas) return;
+  const existing = window.Chart && window.Chart.getChart ? window.Chart.getChart(canvas) : null;
+  if (existing) existing.destroy();
 
-  new Chart(ctx, {
+  new Chart(canvas, {
     type: 'bar',
     data: {
       labels: ['True', 'False', 'Misleading', 'Unverified'],
@@ -146,9 +150,6 @@ function buildCard(item) {
   badge.textContent = isTrue ? "True" : "False";
   badgeContainer.appendChild(badge);
 
-  const summary = document.createElement("p");
-  summary.className = "claim-summary";
-  summary.textContent = item.explanation || "";
 
   const btn = document.createElement("button");
   btn.className = "toggle-btn";
@@ -220,24 +221,42 @@ function buildCard(item) {
   card.appendChild(indicator);
   card.appendChild(title);
   card.appendChild(badgeContainer);
-  card.appendChild(summary);
   card.appendChild(btn);
   card.appendChild(evidence);
   return card;
 }
 
-async function init() {
+async function loadClaims() {
+  const loadingBanner = document.getElementById("loadingBanner");
+  const container = document.getElementById("claimsContainer");
+
   try {
+    // Show loading banner
+    if (loadingBanner) loadingBanner.style.display = "flex";
+    if (container) container.innerHTML = "";
+
     console.time("fetch-dashboard-claims");
-    const res = await fetch(API_URL, { cache: "no-store" });
+    // Add timestamp to URL to force cache bypass
+    const timestamp = new Date().getTime();
+    const res = await fetch(`${API_URL}?t=${timestamp}`, {
+      cache: "no-store",
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
     if (!res.ok) {
       console.error(`Failed to load dashboard claims (${res.status})`);
+      if (loadingBanner) loadingBanner.style.display = "none";
       return;
     }
     const data = await res.json();
     console.timeEnd("fetch-dashboard-claims");
+    console.log("Loaded claims:", data.length, "First claim:", data[0]?.claim?.substring(0, 50));
 
-    const container = document.getElementById("claimsContainer");
+    // Hide loading banner
+    if (loadingBanner) loadingBanner.style.display = "none";
+
     if (container) {
       container.innerHTML = "";
       data.forEach(item => container.appendChild(buildCard(item)));
@@ -249,8 +268,32 @@ async function init() {
     buildBarChart(stats);
   } catch (e) {
     console.error(`Error fetching dashboard data: ${e}`);
-    const container = document.getElementById("claimsContainer");
+    if (loadingBanner) loadingBanner.style.display = "none";
     if (container) container.innerHTML = "";
+  }
+}
+
+async function init() {
+  // Load claims initially
+  await loadClaims();
+
+  // Add event listener to refresh button
+  const refreshBtn = document.getElementById("refreshClaimsBtn");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", async () => {
+      console.log("Refresh button clicked!");
+      // Add spinning animation to button
+      const icon = refreshBtn.querySelector(".refresh-icon");
+      if (icon) icon.classList.add("spinning");
+      refreshBtn.disabled = true;
+
+      // Reload claims
+      await loadClaims();
+
+      // Remove spinning animation
+      if (icon) icon.classList.remove("spinning");
+      refreshBtn.disabled = false;
+    });
   }
 }
 

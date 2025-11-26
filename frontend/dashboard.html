@@ -30,10 +30,20 @@
     <!-- Left Column: Claims Feed -->
     <div class="feed-column">
       <section class="page-header">
-        <h1>📋 Verified Claims Feed</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h1>📋 Verified Claims Feed</h1>
+          <button id="refreshClaimsBtn" class="refresh-btn">
+            <span class="refresh-icon">🔄</span>
+            Refresh Claims
+          </button>
+        </div>
       </section>
 
       <section class="claims">
+        <div id="loadingBanner" class="loading-banner" style="display: none;">
+          <div class="loading-spinner"></div>
+          <span>Loading claims...</span>
+        </div>
         <div id="claimsContainer" class="claims-grid"></div>
       </section>
     </div>

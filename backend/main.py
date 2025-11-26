@@ -13,10 +13,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 import logging
+import asyncio
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv()
+# Use override=True so that changes to .env take effect even if vars were set earlier
+load_dotenv(override=True)
 
 from backend.agents.claim_ingestion_agent import ClaimIngestionAgent
 from backend.agents.research_agent import ResearchAgent
@@ -146,6 +148,77 @@ async def about_page():
     """Serve the about page."""
     return FileResponse(os.path.join(os.path.dirname(__file__), "..", "frontend", "about.html"))
 
+
+@app.get("/dashboard/claims")
+async def get_dashboard_claims(limit: int = 15):
+    """Return a sample of claims for the dashboard feed."""
+    try:
+        items = load_random_dashboard_claims(n=limit)
+        results = []
+        for it in items:
+            raw_label = str(it.get("label", "")).lower()
+            if "true" in raw_label or "real" in raw_label:
+                verdict = "True"
+            elif "false" in raw_label or "fake" in raw_label:
+                verdict = "False"
+            else:
+                verdict = "Unverified"
+            results.append({
+                "claim": it.get("claim", ""),
+                "verdict": verdict,
+                "explanation": ""
+            })
+        return results
+    except Exception as e:
+        logger.error(f"[API] Failed to load dashboard claims: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load dashboard claims")
+
+
+class ExplainRequest(BaseModel):
+    claim: str
+    verdict: str
+
+@app.post("/explain-claim")
+async def explain_claim(req: ExplainRequest):
+    """Generate AI explanation on demand for a claim."""
+    try:
+        research_agent = get_research_agent()
+        investigator_agent = get_investigator_agent()
+        # Attempt Gemini-backed research and investigation
+        try:
+            evidence_json = research_agent.process(req.claim)
+            verdict_json = investigator_agent.process(req.claim, evidence_json)
+            explanation = verdict_json.get("reasoning")
+            if explanation:
+                return {"explanation": explanation}
+        except Exception as e:
+            logger.warning(f"[API] AI explanation path failed: {e}")
+        # Rule-based fallback explanation using provided verdict
+        v = (req.verdict or "Unverified").strip().lower()
+        if v == "true":
+            fallback = (
+                "Labelled True: the claim aligns with available sources and shows no strong "
+                "manipulation signals in the quick screening."
+            )
+        elif v == "false":
+            fallback = (
+                "Labelled False: the claim contradicts available reporting or contains clear "
+                "factual inaccuracies based on quick checks."
+            )
+        elif v == "misleading":
+            fallback = (
+                "Labelled Misleading: elements of the claim appear selectively framed or out of "
+                "context, producing a distorted impression despite partial facts."
+            )
+        else:
+            fallback = (
+                "Labelled Unverified: insufficient corroboration found in a quick scan; a deeper "
+                "investigation would be required to confirm."
+            )
+        return {"explanation": fallback}
+    except Exception as e:
+        logger.error(f"[API] explain-claim error: {e}")
+        return {"explanation": "Unable to generate explanation."}
 
 @app.post("/claims/submit", response_model=ClaimSubmitResponse)
 async def submit_claim(request: ClaimSubmitRequest, background_tasks: BackgroundTasks):
@@ -318,7 +391,17 @@ async def get_dashboard_claims():
             })
         
         logger.info(f"[API] Returning {len(dashboard_claims)} dashboard claims")
-        return dashboard_claims
+        
+        # Create response with no-cache headers to ensure fresh data every time
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            content=dashboard_claims,
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
         
     except Exception as e:
         logger.error(f"[API] Error loading dashboard claims: {str(e)}")

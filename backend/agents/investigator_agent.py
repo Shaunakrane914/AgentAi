@@ -11,6 +11,8 @@ import re
 from typing import Dict
 from google import genai
 from google.genai import types as genai_types
+from dotenv import load_dotenv
+import os as _os
 
 
 class InvestigatorAgent:
@@ -28,20 +30,53 @@ class InvestigatorAgent:
         2. GEMINI_API_KEY (fallback)
         """
         print("[InvestigatorAgent] Initializing Investigator Agent")
+        # Resolve and log the .env path we are actually loading
+        env_path = _os.path.abspath(
+            _os.path.join(_os.path.dirname(__file__), "..", "..", ".env")
+        )
+        print(f"[InvestigatorAgent] Loading .env from: {env_path}")
+        # Force-reload .env so updated keys are picked up even if process reused
+        load_dotenv(env_path, override=True)
         
-        # Key priority: GEMINI_API_KEY_2 first, then GEMINI_API_KEY
-        api_key = os.getenv("GEMINI_API_KEY_2") or os.getenv("GEMINI_API_KEY")
-        
+        # Key priority with sanitization: GEMINI_API_KEY_2 → GEMINI_API_KEY_1 → GEMINI_API_KEY
+        def _clean(s: str | None) -> str:
+            if not s:
+                return ""
+            return s.strip().strip('"').strip("'")
+        raw_k2 = os.getenv("GEMINI_API_KEY_2")
+        raw_k1 = os.getenv("GEMINI_API_KEY_1")
+        raw_k = os.getenv("GEMINI_API_KEY")
+        print(
+            "[InvestigatorAgent] Env snapshot - "
+            f"GEMINI_API_KEY_2: {(_clean(raw_k2)[:10] + '...') if raw_k2 else 'None'}, "
+            f"GEMINI_API_KEY_1: {(_clean(raw_k1)[:10] + '...') if raw_k1 else 'None'}, "
+            f"GEMINI_API_KEY: {(_clean(raw_k)[:10] + '...') if raw_k else 'None'}"
+        )
+
+        # Choose API key and model based on which env var is used:
+        # - GEMINI_API_KEY_1  -> gemini-2.5-flash-lite
+        # - GEMINI_API_KEY_2 or GEMINI_API_KEY -> gemini-2.0-flash-lite
+        api_key = None
+        if _clean(raw_k1):
+            api_key = _clean(raw_k1)
+            self.model_name = "gemini-2.5-flash-lite"
+        elif _clean(raw_k2):
+            api_key = _clean(raw_k2)
+            self.model_name = "gemini-2.0-flash-lite"
+        elif _clean(raw_k):
+            api_key = _clean(raw_k)
+            self.model_name = "gemini-2.0-flash-lite"
+
         if not api_key:
             raise ValueError(
-                "[InvestigatorAgent] No API key found. Set GEMINI_API_KEY_2 or GEMINI_API_KEY"
+                "[InvestigatorAgent] No API key found. Set GEMINI_API_KEY_1, GEMINI_API_KEY_2 or GEMINI_API_KEY"
             )
-        
+
         print(f"[InvestigatorAgent] Using API key: {api_key[:10]}...")
-        
-        # Configure Gemini client with flash-lite model
+        print(f"[InvestigatorAgent] Using model: {self.model_name}")
+
+        # Configure Gemini client with chosen model
         self.client = genai.Client(api_key=api_key)
-        self.model_name = "gemini-2.0-flash-lite"
         
         print(f"[InvestigatorAgent] Configured with model: {self.model_name}")
         print("[InvestigatorAgent] Initialization complete")
