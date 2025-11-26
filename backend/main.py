@@ -435,14 +435,8 @@ Claim: "{claim_text}"
 
 Provide a brief, factual explanation."""
         
-        # Use Gemini to generate explanation
-        import google.generativeai as genai
-        response = research_agent.client.models.generate_content(
-            model=research_agent.model_name,
-            contents=prompt_text
-        )
-        
-        explanation = response.text.strip()
+        # Use ResearchAgent's Gemini HTTP helper to generate explanation
+        explanation = research_agent._call_gemini(prompt_text).strip()
         
         logger.info(f"[API] Generated explanation for claim")
         return {"explanation": explanation}

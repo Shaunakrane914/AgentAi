@@ -9,8 +9,7 @@ import os
 import json
 import re
 from typing import Dict
-from google import genai
-from google.genai import types as genai_types
+import requests
 from dotenv import load_dotenv
 import os as _os
 
@@ -72,11 +71,36 @@ class InvestigatorAgent:
                 "[InvestigatorAgent] No API key found. Set GEMINI_API_KEY_1, GEMINI_API_KEY_2 or GEMINI_API_KEY"
             )
 
+        # Store key for direct HTTP calls
+        self.api_key = api_key
+
         print(f"[InvestigatorAgent] Using API key: {api_key[:10]}...")
         print(f"[InvestigatorAgent] Using model: {self.model_name}")
 
-        # Configure Gemini client with chosen model
-        self.client = genai.Client(api_key=api_key)
+    def _call_gemini(self, prompt: str) -> str:
+        """
+        Call Gemini text model via HTTP and return the first text candidate.
+        """
+        print("[InvestigatorAgent] Calling Gemini via HTTP API...")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
+            ]
+        }
+        params = {"key": self.api_key}
+        resp = requests.post(url, headers=headers, params=params, json=payload, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        try:
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception:
+            return json.dumps(data)
         
         print(f"[InvestigatorAgent] Configured with model: {self.model_name}")
         print("[InvestigatorAgent] Initialization complete")
@@ -182,15 +206,9 @@ GUIDELINES:
 Return ONLY the JSON object, nothing else."""
             
             print("[InvestigatorAgent] Sending investigation request to Gemini...")
-            
-            # Call Gemini API
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
-            )
-            
-            # Extract raw text
-            raw_text = response.text
+
+            # Call Gemini API via HTTP
+            raw_text = self._call_gemini(prompt)
             
             print(f"[InvestigatorAgent] Received response ({len(raw_text)} characters)")
             print(f"[InvestigatorAgent] Raw response preview: {raw_text[:150]}...")

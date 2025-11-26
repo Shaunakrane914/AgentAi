@@ -9,8 +9,7 @@ import os
 import json
 import re
 from typing import Dict, List
-from google import genai
-from google.genai import types as genai_types
+import requests
 from dotenv import load_dotenv
 import os as _os
 
@@ -74,11 +73,38 @@ class ResearchAgent:
                 "[ResearchAgent] No API key found. Set GEMINI_API_KEY_1, GEMINI_API_KEY_2 or GEMINI_API_KEY"
             )
 
+        # Store key for direct HTTP calls
+        self.api_key = api_key
+
         print(f"[ResearchAgent] Using API key: {api_key[:10]}...")
         print(f"[ResearchAgent] Using model: {self.model_name}")
 
-        # Configure Gemini client
-        self.client = genai.Client(api_key=api_key)
+    def _call_gemini(self, prompt: str) -> str:
+        """
+        Call Gemini text model via HTTP and return the first text candidate.
+        """
+        print("[ResearchAgent] Calling Gemini via HTTP API...")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
+            ]
+        }
+        params = {"key": self.api_key}
+        resp = requests.post(url, headers=headers, params=params, json=payload, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        # Extract first text response safely
+        try:
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception:
+            # Fallback: return raw JSON string
+            return json.dumps(data)
         
         print(f"[ResearchAgent] Configured with model: {self.model_name}")
         print("[ResearchAgent] Initialization complete")
@@ -116,15 +142,9 @@ Provide at least 2-3 evidence points for each category if available."""
         
         try:
             print("[ResearchAgent] Sending request to Gemini API...")
-            
-            # Call Gemini API
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
-            )
-            
-            # Extract raw text from response
-            raw_text = response.text
+
+            # Call Gemini API over HTTP
+            raw_text = self._call_gemini(prompt)
             
             print(f"[ResearchAgent] Received response ({len(raw_text)} characters)")
             print(f"[ResearchAgent] Raw response preview: {raw_text[:100]}...")
@@ -287,11 +307,7 @@ REQUIREMENTS:
   "evidence_url": "https://<one credible source>"
 }}
 """
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
-            )
-            raw_text = response.text
+            raw_text = self._call_gemini(prompt)
             cleaned = raw_text.strip()
             cleaned = re.sub(r'^```json\s*', '', cleaned, flags=re.IGNORECASE)
             cleaned = re.sub(r'^```\s*', '', cleaned)

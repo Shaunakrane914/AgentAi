@@ -6,8 +6,7 @@ pydantic==2.5.3
 # Database
 supabase==2.3.0
 
-# AI/ML (new Google GenAI client)
-google-genai==0.3.0
+# AI/ML - using direct HTTP calls to Gemini, no client lib needed
 
 # Utilities
 python-dotenv==1.0.0
