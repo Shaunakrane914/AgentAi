@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="dashboard.css">
 </head>
 
 <body>
@@ -46,7 +46,8 @@
   </main>
 
   <script>
-    const API_BASE = 'http://127.0.0.1:8000';
+    // Backend API lives on Render; update this if you change the Render URL
+    const API_BASE = 'https://misinfo-5f13.onrender.com';
     const form = document.getElementById('claimForm');
     const resultCard = document.getElementById('resultCard');
     const resultContent = document.getElementById('resultContent');

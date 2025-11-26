@@ -1,4 +1,6 @@
-const API_URL = "http://127.0.0.1:8000/api/dashboard/claims";
+// Backend API base lives on Render; update this if you change the Render URL
+const API_BASE = "https://misinfo-5f13.onrender.com";
+const API_URL = `${API_BASE}/api/dashboard/claims`;
 
 function updateStatCards(items) {
   const trueCount = items.filter(i => String(i.verdict).toLowerCase() === "true").length;
@@ -176,7 +178,7 @@ function buildCard(item) {
       try {
         evidenceContent.innerHTML = `<p style="color: #64748b;">🤖 Generating AI explanation...</p>`;
 
-        const response = await fetch("http://127.0.0.1:8000/api/explain-claim", {
+        const response = await fetch(`${API_BASE}/api/explain-claim`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
