@@ -53,18 +53,18 @@ class InvestigatorAgent:
         )
 
         # Choose API key and model based on which env var is used:
-        # - GEMINI_API_KEY_1  -> gemini-2.5-flash-lite
-        # - GEMINI_API_KEY_2 or GEMINI_API_KEY -> gemini-2.0-flash-lite
+        # - GEMINI_API_KEY_1  -> gemini-1.5-flash (stable, fast)
+        # - GEMINI_API_KEY_2 or GEMINI_API_KEY -> gemini-1.5-flash (stable, fast)
         api_key = None
         if _clean(raw_k1):
             api_key = _clean(raw_k1)
-            self.model_name = "gemini-2.5-flash-lite"
+            self.model_name = "gemini-1.5-flash"
         elif _clean(raw_k2):
             api_key = _clean(raw_k2)
-            self.model_name = "gemini-2.0-flash-lite"
+            self.model_name = "gemini-1.5-flash"
         elif _clean(raw_k):
             api_key = _clean(raw_k)
-            self.model_name = "gemini-2.0-flash-lite"
+            self.model_name = "gemini-1.5-flash"
 
         if not api_key:
             raise ValueError(
